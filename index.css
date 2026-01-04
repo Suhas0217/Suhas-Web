@@ -33,7 +33,7 @@ body {
 .button {
   background-color: #ffffff00;
   color: #fff;
-  width: 9lem;
+  width: 11lem;
   height: 2.9em;
   border: #3654ff 0.2em solid;
   border-radius: 11px;
@@ -248,3 +248,4 @@ button:active {
     filter: hue-rotate(360deg);
   }
 }
+
