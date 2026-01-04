@@ -47,7 +47,7 @@ body {
 }
 
 .button svg {
-  width: 1.6em;
+  width: 1em;
   margin: -0.2em 0.8em 1em;
   position: absolute;
   display: flex;
@@ -248,4 +248,5 @@ button:active {
     filter: hue-rotate(360deg);
   }
 }
+
 
