@@ -30,6 +30,13 @@ body {
   color: #c76b10;
 }
 
+#copyright {
+  margin-top: 40px;
+  text-align: center;
+  color: #bdbdbd;
+  font-size: 12px;
+}
+
 .button {
   background-color: #ffffff00;
   color: #fff;
