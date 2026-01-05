@@ -30,6 +30,32 @@ body {
   color: #c76b10;
 }
 
+.footer {
+  text-align: center;
+  margin-top: 5rem;
+  padding: 1.4rem 0;
+  font-size: 25px;
+  letter-spacing: 3px;
+  color: #7ffcff;
+  background: linear-gradient(180deg, transparent, #000);
+  text-shadow: 0 0 8px #00ffff;
+}
+
+.footer span {
+  color: #00ffee;
+}
+
+.pulse {
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0% { opacity: 0.2; }
+  50% { opacity: 1; }
+  100% { opacity: 0.2; }
+}
+
+
 .button {
   background-color: #ffffff00;
   color: #fff;
@@ -248,7 +274,3 @@ button:active {
     filter: hue-rotate(360deg);
   }
 }
-
-
-
-
