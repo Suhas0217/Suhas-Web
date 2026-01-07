@@ -5,6 +5,10 @@ body {
   overflow: hidden;
 }
 
+#header {
+  color: white;
+}
+
 span {
   background: url("https://cdn4.iconfinder.com/data/icons/celestial-and-witchcraft/500/star_decoration_shiny_bright_sparkle_shine_light_stars_sky_glitter-1024.png");
   width: 100px;
