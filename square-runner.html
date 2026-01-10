@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Square Runner</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<style>
+body{
+  margin:0;
+  background: radial-gradient(circle at center, #111 0%, #05050a 70%, #000 100%);
+  overflow:hidden;
+  font-family: Arial, Helvetica, sans-serif;
+}
+#score{
+  position:absolute;
+  top:15px;
+  left:15px;
+  color:cyan;
+  font-size:20px;
+  text-shadow:0 0 10px cyan;
+}
+#restartBtn{
+  position:absolute;
+  top:55%;
+  left:50%;
+  transform:translate(-50%,-50%);
+  padding:16px 32px;
+  font-size:24px;
+  background:linear-gradient(45deg,#00ffff,#0088ff);
+  border:none;
+  border-radius:8px;
+  cursor:pointer;
+  display:none;
+  box-shadow:0 0 20px cyan;
+}
+#uploadBtn{
+  position:absolute;
+  bottom:25px;
+  left:50%;
+  transform:translateX(-50%);
+  padding:14px 28px;
+  font-size:18px;
+  color:#00ffff;
+  background:rgba(0,0,0,0.6);
+  border:2px solid cyan;
+  border-radius:10px;
+  cursor:pointer;
+  text-shadow:0 0 10px cyan;
+  box-shadow:0 0 15px cyan;
+  transition:.2s;
+  z-index:10;
+}
+#uploadBtn:hover{
+  background:cyan;
+  color:black;
+  box-shadow:0 0 30px cyan;
+}
+</style>
+</head>
+<body>
+
+<div id="score"></div>
+<button id="restartBtn">Restart</button>
+<label id="uploadBtn">
+  Upload Custom Skin
+  <input type="file" id="skinUpload" accept="image/*" hidden>
+</label>
+<canvas id="game"></canvas>
+
+<script>
+const canvas=document.getElementById("game");
+const ctx=canvas.getContext("2d");
+canvas.width=innerWidth;
+canvas.height=innerHeight;
+
+const scoreDisplay=document.getElementById("score");
+const restartBtn=document.getElementById("restartBtn");
+const uploadBtn=document.getElementById("uploadBtn");
+
+const logo=new Image();
+logo.src="favicon.png";
+
+let customSkin=null;
+let useCustomSkin=false;
+
+function drawCropped(img,x,y,w,h){
+  const scale=Math.max(w/img.width,h/img.height);
+  const sw=w/scale, sh=h/scale;
+  const sx=(img.width-sw)/2, sy=(img.height-sh)/2;
+  ctx.drawImage(img,sx,sy,sw,sh,x,y,w,h);
+}
+
+document.getElementById("skinUpload").onchange=e=>{
+  const file=e.target.files[0];
+  if(!file)return;
+  const img=new Image();
+  img.onload=()=>{customSkin=img;useCustomSkin=true;}
+  img.src=URL.createObjectURL(file);
+};
+
+const skins=[
+  {color:"cyan",glow:"cyan"},
+  {color:"orange",glow:"red"},
+  {color:"lime",glow:"lime"},
+  {color:"#bb00ff",glow:"#ff00ff"},
+  {color:"gold",glow:"yellow"}
+];
+let skinIndex=0;
+
+const player={x:0,y:0,size:30,speed:12,baseSpeed:12,color:"cyan",glow:"cyan"};
+
+let enemies=[],collectibles=[],powerUps=[],particles=[],bossBullets=[];
+let enemyCount=0,score=0,bestScore=localStorage.getItem("bestScore")||0;
+let gameStarted=false,gameOver=false;
+let shield=false,magnet=false,magnetTimer=0,powerTimer=0;
+const keys={};
+
+onkeydown=e=>{
+  keys[e.key]=true;
+  if(!gameStarted){
+    if(e.key==="ArrowLeft")skinIndex=(skinIndex-1+skins.length)%skins.length;
+    if(e.key==="ArrowRight")skinIndex=(skinIndex+1)%skins.length;
+    if(e.key!=="ArrowLeft"&&e.key!=="ArrowRight"){
+      gameStarted=true;
+      uploadBtn.style.display="none";
+      resetGame();
+    }
+  }
+  if(gameOver&&e.key==="Enter")resetGame();
+};
+onkeyup=e=>keys[e.key]=false;
+restartBtn.onclick=()=>resetGame();
+
+function clamp(o){
+  const h=o.size/2;
+  o.x=Math.max(h,Math.min(canvas.width-h,o.x));
+  o.y=Math.max(h,Math.min(canvas.height-h,o.y));
+}
+function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y);}
+
+function resetGame(){
+  enemies=[];collectibles=[];powerUps=[];particles=[];bossBullets=[];
+  enemyCount=0;score=0;shield=false;magnet=false;powerTimer=0;
+  player.color=skins[skinIndex].color;
+  player.glow=skins[skinIndex].glow;
+  player.speed=player.baseSpeed;
+  player.x=canvas.width/2;player.y=canvas.height/2;
+  gameOver=false;
+  restartBtn.style.display="none";
+
+  spawnCollectible();   // <-- THIS was missing
+
+  updateScore();
+}
+
+
+function updateScore(){
+  scoreDisplay.textContent=`Score: ${score}   Best: ${bestScore}`;
+}
+
+function spawnCollectible(){
+  collectibles.push({x:Math.random()*canvas.width,y:Math.random()*canvas.height,size:20});
+}
+
+function spawnEnemy(){
+  enemyCount++;
+  const isBoss=enemyCount%5===0;
+  let x,y;
+  const s=Math.floor(Math.random()*4);
+  if(s===0){x=0;y=Math.random()*canvas.height;}
+  if(s===1){x=canvas.width;y=Math.random()*canvas.height;}
+  if(s===2){x=Math.random()*canvas.width;y=0;}
+  if(s===3){x=Math.random()*canvas.width;y=canvas.height;}
+  const e={x,y,size:isBoss?70:30,speed:isBoss?1.5:2+Math.random()*2,isBoss,shootTimer:0};
+  enemies.push(e);
+  if(isBoss){
+    const types=["speed","shield","magnet","bomb"];
+    powerUps.push({x,y,size:18,type:types[Math.floor(Math.random()*types.length)]});
+  }
+}
+
+function shootBoss(e){
+  bossBullets.push({x:e.x,y:e.y,vx:(player.x-e.x)/120,vy:(player.y-e.y)/120,size:6});
+}
+
+function createParticles(x,y){
+  for(let i=0;i<40;i++){
+    particles.push({x,y,vx:(Math.random()-0.5)*10,vy:(Math.random()-0.5)*10,life:60});
+  }
+}
+
+function update(){
+  if(!gameStarted||gameOver)return;
+
+  if(powerTimer>0){
+    powerTimer--;
+    if(powerTimer===0)player.speed=player.baseSpeed;
+  }
+
+  if(magnet){
+    magnetTimer--;
+    collectibles.forEach(c=>{
+      const dx=player.x-c.x,dy=player.y-c.y,d=Math.hypot(dx,dy);
+      if(d<300){c.x+=dx/d*6;c.y+=dy/d*6;}
+    });
+    if(magnetTimer<=0)magnet=false;
+  }
+
+  if(keys.ArrowUp||keys.w)player.y-=player.speed;
+  if(keys.ArrowDown||keys.s)player.y+=player.speed;
+  if(keys.ArrowLeft||keys.a)player.x-=player.speed;
+  if(keys.ArrowRight||keys.d)player.x+=player.speed;
+  clamp(player);
+
+  enemies.forEach((e,ei)=>{
+    const dx=player.x-e.x,dy=player.y-e.y,d=Math.hypot(dx,dy);
+    e.x+=dx/d*e.speed;
+    e.y+=dy/d*e.speed;
+    clamp(e);
+
+    if(e.isBoss){
+      e.shootTimer++;
+      if(e.shootTimer>90){e.shootTimer=0;shootBoss(e);}
+    }
+
+    if(dist(player,e)<player.size){
+      if(shield){shield=false;enemies.splice(ei,1);}
+      else{
+        gameOver=true;
+        createParticles(player.x,player.y);
+        restartBtn.style.display="block";
+        uploadBtn.style.display="block";
+        if(score>bestScore){bestScore=score;localStorage.setItem("bestScore",bestScore);}
+      }
+    }
+  });
+
+  bossBullets.forEach((b,bi)=>{
+    b.x+=b.vx;b.y+=b.vy;
+    if(dist(player,b)<player.size/2){
+      if(shield){shield=false;bossBullets.splice(bi,1);}
+      else{gameOver=true;createParticles(player.x,player.y);restartBtn.style.display="block";uploadBtn.style.display="block";}
+    }
+  });
+
+  collectibles.forEach((c,ci)=>{
+    if(dist(player,c)<player.size){
+      collectibles.splice(ci,1);
+      score++;spawnCollectible();updateScore();
+    }
+  });
+
+  powerUps.forEach((p,pi)=>{
+    if(dist(player,p)<player.size){
+      powerUps.splice(pi,1);
+      if(p.type==="speed"){player.speed=20;powerTimer=300;}
+      if(p.type==="shield"){shield=true;setTimeout(()=>shield=false,5000);}
+      if(p.type==="magnet"){magnet=true;magnetTimer=300;}
+      if(p.type==="bomb"){enemies=enemies.filter(e=>dist(player,e)>200);}
+    }
+  });
+
+  particles.forEach((p,pi)=>{
+    p.x+=p.vx;p.y+=p.vy;
+    if(--p.life<=0)particles.splice(pi,1);
+  });
+}
+
+function draw(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  if(!gameStarted){
+    ctx.textAlign="center";
+    ctx.shadowColor="cyan";ctx.shadowBlur=30;
+    ctx.drawImage(logo,canvas.width/2-64,canvas.height/2-360,128,128);
+    ctx.font="90px Arial Black";ctx.fillStyle="cyan";
+    ctx.fillText("SQUARE RUNNER",canvas.width/2,canvas.height/2);
+    ctx.shadowBlur=0;ctx.font="22px Arial";ctx.fillStyle="white";
+    ctx.fillText("Use ← → to change skin",canvas.width/2,canvas.height/2+220);
+    ctx.fillText("Upload your own image below",canvas.width/2,canvas.height/2+250);
+    ctx.fillText("Press any key to start",canvas.width/2,canvas.height/2+280);
+
+    if(useCustomSkin&&customSkin) drawCropped(customSkin,canvas.width/2-25,canvas.height/2+150,50,50);
+    else{
+      ctx.shadowColor=skins[skinIndex].glow;ctx.shadowBlur=25;
+      ctx.fillStyle=skins[skinIndex].color;
+      ctx.fillRect(canvas.width/2-25,canvas.height/2+150,50,50);
+    }
+    ctx.textAlign="left";return;
+  }
+
+  if(useCustomSkin&&customSkin) drawCropped(customSkin,player.x-20,player.y-20,40,40);
+  else{
+    ctx.shadowColor=player.glow;ctx.shadowBlur=25;
+    ctx.fillStyle=player.color;
+    if(!gameOver)ctx.fillRect(player.x-15,player.y-15,30,30);
+  }
+
+  enemies.forEach(e=>{
+    ctx.shadowColor=e.isBoss?"purple":"red";
+    ctx.fillStyle=e.isBoss?"purple":"red";
+    ctx.fillRect(e.x-e.size/2,e.y-e.size/2,e.size,e.size);
+  });
+
+  ctx.shadowColor="magenta";ctx.fillStyle="magenta";
+  bossBullets.forEach(b=>ctx.fillRect(b.x-3,b.y-3,b.size,b.size));
+
+  ctx.shadowColor="lime";ctx.fillStyle="lime";
+  collectibles.forEach(c=>ctx.fillRect(c.x-10,c.y-10,20,20));
+
+  powerUps.forEach(p=>{
+    if(p.type==="speed")ctx.fillStyle="yellow";
+    if(p.type==="shield")ctx.fillStyle="deepskyblue";
+    if(p.type==="magnet")ctx.fillStyle="lime";
+    if(p.type==="bomb")ctx.fillStyle="red";
+    ctx.shadowColor=ctx.fillStyle;
+    ctx.fillRect(p.x-8,p.y-8,16,16);
+  });
+
+  ctx.shadowColor="cyan";ctx.fillStyle="cyan";
+  particles.forEach(p=>ctx.fillRect(p.x,p.y,4,4));
+}
+
+setInterval(()=>{if(gameStarted&&!gameOver)spawnEnemy();},2000);
+function loop(){update();draw();requestAnimationFrame(loop);}
+loop();
+</script>
+</body>
+</html>
